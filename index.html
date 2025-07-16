@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ← ここに追加！ -->
+  <title>予定選択カレンダー</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    h2 { margin-bottom: 5px; }
+    h3 { margin-top: 0; }
+    table { margin: 0 auto; border-collapse: collapse; width: 80%; max-width: 600px; }
+    th, td { padding: 10px; border: 1px solid #ccc; cursor: pointer; }
+    th.sunday, td.sunday { color: red; }
+    th.saturday, td.saturday { color: blue; }
+    .rank1 { background-color: #28a745; color: white; }
+    .rank2 { background-color: #ffc107; }
+    .rank3 { background-color: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+  <h2>希望日を選んでください（最大3日）</h2>
+  <h3 id="month-label"></h3>
+  <table id="calendar"></table>
+
+  <div style="margin-top:20px;">
+    <p>第１希望日：<span id="choice1">-</span></p>
+    <p>第２希望日：<span id="choice2">-</span></p>
+    <p>第３希望日：<span id="choice3">-</span></p>
+    <button onclick="saveChoices()">保存する</button>
+  </div>
+
+  <script>
+    const selectedDates = [];
+    let saved = false;
+
+    const currentYear = 2025;
+    const currentMonth = 7; // 月は0始まり → 7 = 8月
+
+    function updateDisplay() {
+      document.getElementById("choice1").textContent = selectedDates[0] ?? "-";
+      document.getElementById("choice2").textContent = selectedDates[1] ?? "-";
+      document.getElementById("choice3").textContent = selectedDates[2] ?? "-";
+    }
+
+    function createCalendar(year, month) {
+      const calendar = document.getElementById("calendar");
+      calendar.innerHTML = ""; // ← 修正済み（スペルもOK！）
+      const monthLabel = document.getElementById("month-label");
+      const monthNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+      monthLabel.textContent = `${year}年 ${monthNames[month]}`;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+      const headerRow = document.createElement("tr");
+      dayNames.forEach((day, i) => {
+        const th = document.createElement("th");
+        th.textContent = day;
+        if (i === 0) th.className = "sunday";
+        if (i === 6) th.className = "saturday";
+        headerRow.appendChild(th);
+      });
+      calendar.appendChild(headerRow);
+
+      let date = 1;
+      for (let row = 0; row < 6 && date <= daysInMonth; row++) {
+        const tr = document.createElement("tr");
+        for (let col = 0; col < 7; col++) {
+          const td = document.createElement("td");
+          if (row === 0 && col < firstDay) {
+            td.textContent = "";
+          } else if (date <= daysInMonth) {
+            td.textContent = date;
+            td.id = `day-${date}`;
+            td.onclick = ((d) => () => handleDateClick(d))(date);
+            if (col === 0) td.classList.add("sunday");
+            if (col === 6) td.classList.add("saturday");
+            date++;
+          }
+          tr.appendChild(td);
+        }
+        calendar.appendChild(tr);
+      }
+    }
+
+    function handleDateClick(day) {
+      if (saved) return;
+      const index = selectedDates.indexOf(day);
+      if (index !== -1) {
+        selectedDates.splice(index, 1);
+      } else if (selectedDates.length < 3) {
+        selectedDates.push(day);
+      }
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      for (let i = 1; i <= daysInMonth; i++) {
+        const td = document.getElementById(`day-${i}`);
+        if (td) td.classList.remove("rank1", "rank2", "rank3");
+      }
+
+      selectedDates.forEach((d, i) => {
+        const td = document.getElementById(`day-${d}`);
+        if (td) td.classList.add(`rank${i + 1}`);
+      });
+
+      updateDisplay();
+    }
+
+    function saveChoices() {
+      if (selectedDates.length === 0) {
+        alert("最低1つは希望日を選んでください！");
+        return;
+      }
+      saved = true;
+      alert("希望日を保存しました 🎉");
+      console.log("保存された希望日:", selectedDates);
+    }
+
+    createCalendar(currentYear, currentMonth);
+    updateDisplay();
+  </script>
+</body>
+</html>
