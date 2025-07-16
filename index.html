@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ← ここに追加！ -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>予定選択カレンダー</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; }
@@ -22,19 +22,51 @@
   <h3 id="month-label"></h3>
   <table id="calendar"></table>
 
-  <div style="margin-top:20px;">
+  <div id="choices-section" style="margin-top:20px;">
     <p>第１希望日：<span id="choice1">-</span></p>
     <p>第２希望日：<span id="choice2">-</span></p>
     <p>第３希望日：<span id="choice3">-</span></p>
-    <button onclick="saveChoices()">保存する</button>
+    <button id="save-btn">保存する</button>
+    <button id="clear-btn" style="margin-left:10px;">テストデータを削除</button>
   </div>
 
-  <script>
+  <div style="margin-top:30px;">
+    <button id="ranking-btn">ランキングを見る</button>
+  </div>
+
+  <div id="ranking-section" style="display:none; margin-top:20px;">
+    <h3>希望日ランキング</h3>
+    <div id="ranking"></div>
+    <button id="back-btn">カレンダーに戻る</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      serverTimestamp,
+      deleteDoc
+    } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDherYYbpXW20ADYD_9ve52sLjXqpbppvU",
+      authDomain: "calendar-voting.firebaseapp.com",
+      projectId: "calendar-voting",
+      storageBucket: "calendar-voting.firebasestorage.app",
+      messagingSenderId: "1062818293526",
+      appId: "1:1062818293526:web:3597105b47d62f4606d237"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     const selectedDates = [];
     let saved = false;
-
     const currentYear = 2025;
-    const currentMonth = 7; // 月は0始まり → 7 = 8月
+    const currentMonth = 7;
 
     function updateDisplay() {
       document.getElementById("choice1").textContent = selectedDates[0] ?? "-";
@@ -44,7 +76,7 @@
 
     function createCalendar(year, month) {
       const calendar = document.getElementById("calendar");
-      calendar.innerHTML = ""; // ← 修正済み（スペルもOK！）
+      calendar.innerHTML = "";
       const monthLabel = document.getElementById("month-label");
       const monthNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
       monthLabel.textContent = `${year}年 ${monthNames[month]}`;
@@ -107,18 +139,93 @@
       updateDisplay();
     }
 
-    function saveChoices() {
+    async function saveChoices() {
       if (selectedDates.length === 0) {
         alert("最低1つは希望日を選んでください！");
         return;
       }
-      saved = true;
-      alert("希望日を保存しました 🎉");
-      console.log("保存された希望日:", selectedDates);
+
+      try {
+        const votesRef = collection(db, "votes");
+        for (let i = 0; i < selectedDates.length; i++) {
+          await addDoc(votesRef, {
+            day: selectedDates[i],
+            rank: i + 1,
+            points: 3 - i,
+            timestamp: serverTimestamp()
+          });
+        }
+        saved = true;
+        alert("希望日を保存しました 🎉");
+      } catch (e) {
+        console.error("保存エラー:", e);
+        alert("保存に失敗しました 😢");
+      }
     }
 
-    createCalendar(currentYear, currentMonth);
-    updateDisplay();
+    async function clearVotes() {
+      try {
+        const snapshot = await getDocs(collection(db, "votes"));
+        console.log("削除対象件数:", snapshot.size);
+
+        for (const doc of snapshot.docs) {
+          console.log("削除中:", doc.id);
+          await deleteDoc(doc.ref); // ✅ 修正ポイント！
+        }
+
+        alert("テストデータを削除しました 🧹");
+        saved = false;
+      } catch (e) {
+        console.error("削除エラー:", e);
+        alert("データの削除に失敗しました 😢");
+      }
+    }
+
+    async function fetchVotes() {
+      const querySnapshot = await getDocs(collection(db, "votes"));
+      const scores = {};
+      querySnapshot.forEach(doc => {
+        const { day, points } = doc.data();
+        scores[day] = (scores[day] || 0) + points;
+      });
+      return scores;
+    }
+
+    function showRanking(scores) {
+      const rankingDiv = document.getElementById("ranking");
+      rankingDiv.innerHTML = "";
+      const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+      sorted.forEach(([day, score]) => {
+        const item = document.createElement("div");
+        item.textContent = `${day}日: ${score}ポイント`;
+        rankingDiv.appendChild(item);
+      });
+    }
+
+      async function toggleRanking() {
+      const calendarSection = document.querySelector("table");
+      const choicesSection = document.getElementById("choices-section");
+      const rankingSection = document.getElementById("ranking-section");
+      const isRankingVisible = rankingSection.style.display === "block";
+
+      rankingSection.style.display = isRankingVisible ? "none" : "block";
+      calendarSection.style.display = isRankingVisible ? "table" : "none";
+      choicesSection.style.display = isRankingVisible ? "block" : "none";
+
+      if (!isRankingVisible) {
+        const scores = await fetchVotes();
+        showRanking(scores);
+      }
+    }
+
+    window.onload = () => {
+      createCalendar(currentYear, currentMonth);
+      updateDisplay();
+      document.getElementById("save-btn").addEventListener("click", saveChoices);
+      document.getElementById("clear-btn").addEventListener("click", clearVotes);
+      document.getElementById("ranking-btn").addEventListener("click", toggleRanking);
+      document.getElementById("back-btn").addEventListener("click", toggleRanking);
+    };
   </script>
 </body>
 </html>
