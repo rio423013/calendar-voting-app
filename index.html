@@ -15,6 +15,43 @@
     .rank1 { background-color: #28a745; color: white; }
     .rank2 { background-color: #ffc107; }
     .rank3 { background-color: #dc3545; color: white; }
+    .ranking-item {
+    font-size: 1.2em;
+    margin: 10px 0;
+    font-weight: bold;
+    }
+    td {
+      vertical-align: top;
+      width: 14.28%; /* 7列均等 */
+      height: 100px;
+      position: relative;
+      padding: 6px;
+      box-sizing: border-box;
+    }
+    
+    .vote-info {
+      font-size: 0.75em;
+      margin-top: 6px;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      padding: 4px 6px;
+      line-height: 1.5;
+      display: block;
+      text-align: left;
+      min-height: 40px; /* 情報欄の高さを確保 */
+    }
+    .choice1 {
+      background-color: #cce5ff; /* 水色：第1希望 */
+    }
+    .choice2 {
+      background-color: #d4edda; /* 緑：第2希望 */
+    }
+    .choice3 {
+      background-color: #fff3cd; /* 黄色：第3希望 */
+    }
+    .vote-info div {
+    white-space: nowrap;
+  }
   </style>
 </head>
 <body>
@@ -99,9 +136,10 @@
       document.getElementById("choice3").textContent = selectedDates[2] ?? "-";
     }
 
-    function createCalendar(year, month) {
+    async function createCalendar(year, month) {
       const calendar = document.getElementById("calendar");
       calendar.innerHTML = "";
+      const voteCounts = await getVoteCounts(); // 🔍 投票データ取得
       const monthLabel = document.getElementById("month-label");
       const monthNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
       monthLabel.textContent = `${year}年 ${monthNames[month]}`;
@@ -129,13 +167,28 @@
             td.textContent = "";
           } else if (date <= daysInMonth) {
             td.textContent = date;
+
+            const vote = voteCounts[String(date)];
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "vote-info";
+
+            if (vote) {
+              const info = [];
+              if (vote.rank1 > 0) info.push(`<div>第1希望 ${vote.rank1}人</div>`);
+              if (vote.rank2 > 0) info.push(`<div>第2希望 ${vote.rank2}人</div>`);
+              if (vote.rank3 > 0) info.push(`<div>第3希望 ${vote.rank3}人</div>`);
+              infoDiv.innerHTML = info.join("");
+            } else {
+              infoDiv.innerHTML = ""; // 空でも表示して高さを確保
+            }
+            td.appendChild(infoDiv);
             td.id = `day-${date}`;
             td.onclick = ((d) => () => handleDateClick(d))(date);
             if (col === 0) td.classList.add("sunday");
             if (col === 6) td.classList.add("saturday");
             date++;
           }
-          tr.appendChild(td);
+          tr.appendChild(td)
         }
         calendar.appendChild(tr);
       }
@@ -143,6 +196,7 @@
 
     function handleDateClick(day) {
       if (saved) return;
+
       const index = selectedDates.indexOf(day);
       if (index !== -1) {
         selectedDates.splice(index, 1);
@@ -153,12 +207,16 @@
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       for (let i = 1; i <= daysInMonth; i++) {
         const td = document.getElementById(`day-${i}`);
-        if (td) td.classList.remove("rank1", "rank2", "rank3");
+        if (td) {
+          td.classList.remove("choice1", "choice2", "choice3");
+        }
       }
 
       selectedDates.forEach((d, i) => {
         const td = document.getElementById(`day-${d}`);
-        if (td) td.classList.add(`rank${i + 1}`);
+        if (td) {
+          td.classList.add(`choice${i + 1}`);
+        }
       });
 
       updateDisplay();
@@ -203,20 +261,29 @@
 
     async function clearVotes() {
       try {
-        if (!currentUserId) {
-          alert("ログインしていません");
+        const username = document.getElementById("username").value.trim();
+        if (!username) {
+          alert("名前を入力してください");
           return;
         }
 
-        const q = query(collection(db, "votes"), where("userId", "==", currentUserId));
+        const q = query(collection(db, "votes"), where("username", "==", username));
         const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          alert("その名前のデータは見つかりませんでした");
+          return;
+        }
+
         for (const doc of snapshot.docs) {
           await deleteDoc(doc.ref);
         }
 
-        alert("自分のデータを削除しました 🧹");
+        alert(`ユーザー「${username}」のデータを削除しました 🧹`);
         saved = false;
-            } catch (e) {
+
+        await createCalendar(currentYear, currentMonth); // ← カレンダー再描画
+      } catch (e) {
         console.error("削除エラー:", e);
         alert("データの削除に失敗しました 😢");
       }
@@ -232,14 +299,77 @@
       return scores;
     }
 
+    async function getVoteCounts() {
+      const snapshot = await getDocs(collection(db, "votes"));
+      const counts = {}; // { day: { rank1: x, rank2: y, rank3: z } }
+      
+      snapshot.forEach(doc => {
+        const { day, rank } = doc.data();
+        if (!counts[day]) counts[day] = { rank1: 0, rank2: 0, rank3: 0 };
+        counts[day][`rank${rank}`]++;
+      });
+      
+      return counts;
+    }
+    
+    // 🔽 ここに追加！
+    async function fetchUserList() {
+      const snapshot = await getDocs(collection(db, "votes"));
+      const userSet = new Set();
+
+      snapshot.forEach(doc => {
+        const { username } = doc.data();
+        if (username) {
+          userSet.add(username);
+        }
+      });
+      
+      return [...userSet];
+    }
+
     function showRanking(scores) {
       const rankingDiv = document.getElementById("ranking");
       rankingDiv.innerHTML = "";
+
+      // ランキング表示
       const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+      const grouped = {};
       sorted.forEach(([day, score]) => {
+        if (!grouped[score]) grouped[score] = [];
+        grouped[score].push(day);
+      });
+
+      const icons = ["🥇", "🥈", "🥉"];
+      let rank = 1;
+
+      for (const score of Object.keys(grouped).sort((a, b) => b - a)) {
+        if (rank > 3) break;
+        const days = grouped[score];
+        const icon = icons[rank - 1] || `🏅${rank}位`;
+
         const item = document.createElement("div");
-        item.textContent = `${day}日: ${score}ポイント`;
+        item.className = "ranking-item";
+        item.textContent = `${icon} ${days.map(d => `${d}日`).join("、")}`;
         rankingDiv.appendChild(item);
+
+        rank++;
+      }
+
+      // ユーザー一覧表示
+      fetchUserList().then(usernames => {
+        const userListTitle = document.createElement("h4");
+        userListTitle.textContent = "投票したユーザー一覧";
+        userListTitle.style.marginTop = "20px";
+
+        const userList = document.createElement("ul");
+        usernames.forEach(name => {
+          const li = document.createElement("li");
+          li.textContent = name;
+          userList.appendChild(li);
+        });
+
+        rankingDiv.appendChild(userListTitle);
+        rankingDiv.appendChild(userList);
       });
     }
 
