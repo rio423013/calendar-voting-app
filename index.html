@@ -5,33 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>予定選択カレンダー</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; }
-    h2 { margin-bottom: 5px; }
-    h3 { margin-top: 0; }
-    table { margin: 0 auto; border-collapse: collapse; width: 80%; max-width: 600px; }
-    th, td { padding: 10px; border: 1px solid #ccc; cursor: pointer; }
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h2, h3 {
+      margin: 10px 0;
+    } 
+    table { 
+      margin: 0 auto; 
+      border-collapse: collapse; 
+      width: 100%; 
+      max-width: 100%; 
+      font-size: 0.9em;
+    }
+    th, td { padding: 6px; 
+      border: 1px solid #ccc; 
+      cursor: pointer; 
+    }
     th.sunday, td.sunday { color: red; }
     th.saturday, td.saturday { color: blue; }
-    .rank1 { background-color: #28a745; color: white; }
-    .rank2 { background-color: #ffc107; }
-    .rank3 { background-color: #dc3545; color: white; }
-    .ranking-item {
-    font-size: 1.2em;
-    margin: 10px 0;
-    font-weight: bold;
-    }
+
     td {
       vertical-align: top;
       width: 14.28%; /* 7列均等 */
-      height: 100px;
+      height: 80px;
       position: relative;
-      padding: 6px;
       box-sizing: border-box;
+      font-size: 0.85em;
     }
-    
+
     .vote-info {
       font-size: 0.75em;
-      margin-top: 6px;
+      margin-top: 4px;
       background-color: #f0f0f0;
       border-radius: 4px;
       padding: 4px 6px;
@@ -40,6 +48,11 @@
       text-align: left;
       min-height: 40px; /* 情報欄の高さを確保 */
     }
+
+    .vote-info div {
+      white-space: nowrap;
+    }
+
     .choice1 {
       background-color: #cce5ff; /* 水色：第1希望 */
     }
@@ -49,9 +62,52 @@
     .choice3 {
       background-color: #fff3cd; /* 黄色：第3希望 */
     }
-    .vote-info div {
-    white-space: nowrap;
-  }
+
+    .rank1 { background-color: #28a745; color: white; }
+    .rank2 { background-color: #ffc107; }
+    .rank3 { background-color: #dc3545; color: white; }
+    
+    .ranking-item {
+      font-size: 1.2em;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+    
+    input[type="text"] {
+      width: 90%;
+      max-width: 300px;
+      padding: 10px;
+      font-size: 1em;
+      margin-bottom: 10px;
+    }  
+    
+    button {
+      padding: 12px 20px;
+      font-size: 1em;
+      margin: 8px 0;
+      width: 90%;
+      max-width: 300px;
+    }
+
+    @media screen and (max-width: 600px) {
+      h2, h3 {
+        font-size: 1.1em;
+      }
+
+      .vote-info {
+        font-size: 0.8em;
+        padding: 4px;
+      }
+
+      td {
+        height: 70px;
+        font-size: 0.85em;
+      }
+
+      .ranking-item {
+        font-size: 1em;
+      }
+    }
   </style>
 </head>
 <body>
@@ -68,7 +124,7 @@
     <p>第２希望日：<span id="choice2">-</span></p>
     <p>第３希望日：<span id="choice3">-</span></p>
     <button id="save-btn">保存する</button>
-    <button id="clear-btn" style="margin-left:10px;">自分のデータを削除</button>
+    <button id="clear-btn">自分のデータを削除</button>
   </div>
 
   <div style="margin-top:30px;">
