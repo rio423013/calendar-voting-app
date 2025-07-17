@@ -22,12 +22,16 @@
   <h3 id="month-label"></h3>
   <table id="calendar"></table>
 
+  <div id="user-section" style="margin-top:20px;">
+    <input type="text" id="username" placeholder="あなたの名前を入力" />
+  </div>
+
   <div id="choices-section" style="margin-top:20px;">
     <p>第１希望日：<span id="choice1">-</span></p>
     <p>第２希望日：<span id="choice2">-</span></p>
     <p>第３希望日：<span id="choice3">-</span></p>
     <button id="save-btn">保存する</button>
-    <button id="clear-btn" style="margin-left:10px;">テストデータを削除</button>
+    <button id="clear-btn" style="margin-left:10px;">自分のデータを削除</button>
   </div>
 
   <div style="margin-top:30px;">
@@ -48,15 +52,17 @@
       addDoc,
       getDocs,
       serverTimestamp,
-      deleteDoc
+      deleteDoc,
+      query,
+      where
     } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
-    
+
     import {
       getAuth,
       signInAnonymously,
       onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-    
+
     const firebaseConfig = {
       apiKey: "AIzaSyDherYYbpXW20ADYD_9ve52sLjXqpbppvU",
       authDomain: "calendar-voting.firebaseapp.com",
@@ -68,18 +74,13 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
     const auth = getAuth();
     let currentUserId = null;
-    
+
     signInAnonymously(auth)
-    .then(() => {
-      console.log("✅ 匿名ログイン成功");
-    })
-    .catch((error) => {
-      console.error("❌ 匿名ログイン失敗:", error);
-    });
-    
+      .then(() => console.log("✅ 匿名ログイン成功"))
+      .catch((error) => console.error("❌ 匿名ログイン失敗:", error));
+
     onAuthStateChanged(auth, (user) => {
       if (user) {
         currentUserId = user.uid;
@@ -164,6 +165,17 @@
     }
 
     async function saveChoices() {
+      if (!currentUserId) {
+        alert("ログインが完了するまで少し待ってください");
+        return;
+      }
+
+      const username = document.getElementById("username").value.trim();
+      if (!username) {
+        alert("名前を入力してください");
+        return;
+      }
+
       if (selectedDates.length === 0) {
         alert("最低1つは希望日を選んでください！");
         return;
@@ -177,7 +189,8 @@
             rank: i + 1,
             points: 3 - i,
             timestamp: serverTimestamp(),
-            userId: currentUserId // ✅ 追加！
+            userId: currentUserId,
+            username: username
           });
         }
         saved = true;
@@ -188,27 +201,22 @@
       }
     }
 
-    import { query, where } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
-    
     async function clearVotes() {
       try {
         if (!currentUserId) {
           alert("ログインしていません");
           return;
         }
-        
+
         const q = query(collection(db, "votes"), where("userId", "==", currentUserId));
         const snapshot = await getDocs(q);
-        console.log("削除対象件数:", snapshot.size);
-        
         for (const doc of snapshot.docs) {
-          console.log("削除中:", doc.id);
           await deleteDoc(doc.ref);
         }
-        
+
         alert("自分のデータを削除しました 🧹");
         saved = false;
-      } catch (e) {
+            } catch (e) {
         console.error("削除エラー:", e);
         alert("データの削除に失敗しました 😢");
       }
@@ -235,7 +243,7 @@
       });
     }
 
-      async function toggleRanking() {
+    async function toggleRanking() {
       const calendarSection = document.querySelector("table");
       const choicesSection = document.getElementById("choices-section");
       const rankingSection = document.getElementById("ranking-section");
