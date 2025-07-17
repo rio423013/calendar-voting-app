@@ -118,10 +118,19 @@
       .then(() => console.log("✅ 匿名ログイン成功"))
       .catch((error) => console.error("❌ 匿名ログイン失敗:", error));
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentUserId = user.uid;
         console.log("ログインユーザーID:", currentUserId);
+
+        await createCalendar(currentYear, currentMonth);
+        updateDisplay();
+
+        const alreadyVoted = await hasAlreadyVoted(currentUserId);
+        if (alreadyVoted) {
+          saved = true;
+          alert("すでに希望日を入力済みです。再入力するにはデータを削除してください。");
+        }
       }
     });
 
@@ -311,6 +320,13 @@
       
       return counts;
     }
+
+    // 🔽 この下に追加！
+    async function hasAlreadyVoted(userId) {
+      const q = query(collection(db, "votes"), where("userId", "==", userId));
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    }
     
     // 🔽 ここに追加！
     async function fetchUserList() {
@@ -390,8 +406,11 @@
     }
 
     window.onload = () => {
-      createCalendar(currentYear, currentMonth);
-      updateDisplay();
+      const usernameInput = document.getElementById("username");
+      usernameInput.addEventListener("touchend", () => {
+        usernameInput.focus();
+      }, { passive: true });
+
       document.getElementById("save-btn").addEventListener("click", saveChoices);
       document.getElementById("clear-btn").addEventListener("click", clearVotes);
       document.getElementById("ranking-btn").addEventListener("click", toggleRanking);
